@@ -16,7 +16,7 @@ The following phases have been implemented and manually verified:
 | 4 | Bounded agent loop with tool calling and a maximum of five iterations | Implemented |
 | 5 | MCP stdio server exposing `search_logs`, plus a standalone MCP client test | Implemented |
 | 6 | End-to-end log investigation through FastAPI → Ollama → MCP → sample logs | Manually verified |
-| 7 | Automated regression tests with pytest | Planned; not implemented yet |
+| 7 | Deterministic regression tests with pytest | Added in `tests/test_core.py`; run locally with `python -m pytest -q` |
 | 8 | Production hardening, packaging, observability and deployment | Planned |
 
 Latest verified end-to-end example: the agent found payment log `REQ-1002`, whose message is `Payment gateway connection timed out`.
@@ -73,6 +73,10 @@ The files verified in the repository are:
 ```text
 grounded_agent/
 ├── README.md
+├── TESTING.md             # Automated and manual test instructions
+├── requirements.txt       # Runtime and test dependencies
+├── tests/
+│   └── test_core.py       # Deterministic API/tool/log-search regression tests
 └── app/
     ├── main.py              # FastAPI endpoint, Ollama agent loop, local/MCP tool dispatch
     ├── tools.py             # Payment health check and mock order lookup
@@ -113,8 +117,10 @@ If the repository is already cloned and the virtual environment exists, enter th
 The current application imports FastAPI, Pydantic, Uvicorn, the Ollama Python SDK, HTTPX, and the MCP SDK.
 
 ```bash
-pip install fastapi "uvicorn[standard]" pydantic ollama httpx "mcp[cli]"
+python -m pip install -r requirements.txt
 ```
+
+The repository includes `requirements.txt` for the runtime packages and pytest. See [TESTING.md](TESTING.md) for the automated test commands and manual MCP/Ollama checks.
 
 For repeatable installs, a pinned dependency file should be added as a follow-up task. The command above is the direct setup for the current code; it is not a pinned production lockfile.
 
@@ -293,17 +299,17 @@ Read the Uvicorn terminal logs for the underlying exception. The endpoint uses 5
 
 The project is a working learning prototype, not yet production-ready. A sensible next session is:
 
-### Step 1 — Add automated tests
-- Add pytest and use FastAPI's test client.
-- Test `GET /health`.
-- Test mock order lookup for a known and unknown order.
-- Test MCP log search for service/level, keyword, request ID, and no-match cases.
-- Keep tests deterministic; avoid requiring a live LLM for every unit test.
+### Completed — Add deterministic regression tests
+- Added pytest coverage for `GET /health`.
+- Added known and unknown mock-order lookup tests.
+- Added MCP log-search tests for service/level, keyword, request ID, and no-match cases.
+- Added `TESTING.md` with setup and test instructions.
+- Run `python -m pytest -q` locally to validate the suite against the installed dependencies.
 
-### Step 2 — Separate unit and integration tests
-- Unit-test the tool functions and search filters directly.
-- Keep one explicit MCP client integration test.
-- Keep the Ollama-backed `POST /chat` test optional or mark it as an integration test, since it requires a running local model.
+### Next — Expand integration coverage
+- Keep the standalone MCP client smoke test for protocol discovery and tool execution.
+- Add focused tests for the full `/chat` tool-dispatch loop using a mocked Ollama client and MCP session.
+- Keep the real Ollama-backed check optional because it requires a running local model.
 
 ### Step 3 — Improve agent reliability
 - Inspect and validate tool arguments before execution.
