@@ -28,10 +28,11 @@ The current suite covers:
 - MCP log-search filtering by request ID.
 - Keyword search where every supplied term must match.
 - Empty results for filters that match no sample logs.
+- Mocked `/chat` flow: MCP tool discovery and execution, unknown tool handling, and iteration-limit behavior.
 
 ## Manual MCP integration smoke test
 
-The automated core tests call the log-search function directly. To verify MCP protocol startup, tool discovery, and a real MCP tool call through stdio, run:
+The mocked agent-flow tests verify the orchestration logic without starting Ollama or a real MCP subprocess. The automated core tests call the log-search function directly. To verify actual MCP protocol startup, tool discovery, and a tool call through stdio, run:
 
 ```bash
 python -m app.test_mcp_client
@@ -61,6 +62,6 @@ This is a manual integration check because it depends on a running local model a
 ## Current limitations
 
 - These tests use synthetic in-memory data.
-- The suite does not yet cover the full `POST /chat` tool-dispatch loop.
-- The MCP protocol smoke test is manual, not part of the default pytest run.
-- Tests have been added to the repository; run them locally in the project virtual environment to confirm compatibility with your installed dependency versions.
+- The `/chat` tests use fake Ollama responses and a fake MCP session; they do not prove compatibility with every installed Ollama/MCP SDK version.
+- The real MCP protocol smoke test is manual, not part of the default pytest run.
+- Tests have been committed but not executed in this environment; run them locally in the project virtual environment to confirm compatibility with your installed dependency versions.
