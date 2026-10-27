@@ -17,7 +17,7 @@ The following phases have been implemented and manually verified:
 | 5 | MCP stdio server exposing `search_logs`, plus a standalone MCP client test | Implemented |
 | 6 | End-to-end log investigation through FastAPI → Ollama → MCP → sample logs | Manually verified |
 | 7 | Deterministic regression tests with pytest | Core and mocked agent-flow tests added; run locally with `python -m pytest -q` |
-| 8 | Production hardening, packaging, observability and deployment | Planned |
+| 8 | Input limits, basic tool-schema validation, per-operation timeouts, request IDs, safer client errors and structured logs | Implemented; run tests locally |\n| 9 | Authentication, rate limiting, deployment security and deeper observability | Planned |
 
 Latest verified end-to-end example: the agent found payment log `REQ-1002`, whose message is `Payment gateway connection timed out`.
 
