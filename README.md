@@ -16,7 +16,7 @@ The following phases have been implemented and manually verified:
 | 4 | Bounded agent loop with tool calling and a maximum of five iterations | Implemented |
 | 5 | MCP stdio server exposing `search_logs`, plus a standalone MCP client test | Implemented |
 | 6 | End-to-end log investigation through FastAPI → Ollama → MCP → sample logs | Manually verified |
-| 7 | Deterministic regression tests with pytest | Added in `tests/test_core.py`; run locally with `python -m pytest -q` |
+| 7 | Deterministic regression tests with pytest | Core and mocked agent-flow tests added; run locally with `python -m pytest -q` |
 | 8 | Production hardening, packaging, observability and deployment | Planned |
 
 Latest verified end-to-end example: the agent found payment log `REQ-1002`, whose message is `Payment gateway connection timed out`.
@@ -76,7 +76,8 @@ grounded_agent/
 ├── TESTING.md             # Automated and manual test instructions
 ├── requirements.txt       # Runtime and test dependencies
 ├── tests/
-│   └── test_core.py       # Deterministic API/tool/log-search regression tests
+│   ├── test_core.py       # Deterministic API/tool/log-search regression tests
+│   └── test_agent_flow.py # Mocked MCP discovery, tool dispatch, and agent-loop tests
 └── app/
     ├── main.py              # FastAPI endpoint, Ollama agent loop, local/MCP tool dispatch
     ├── tools.py             # Payment health check and mock order lookup
@@ -303,6 +304,7 @@ The project is a working learning prototype, not yet production-ready. A sensibl
 - Added pytest coverage for `GET /health`.
 - Added known and unknown mock-order lookup tests.
 - Added MCP log-search tests for service/level, keyword, request ID, and no-match cases.
+- Added mocked `/chat` flow tests for MCP tool discovery/execution, unknown tools, and the iteration limit.
 - Added `TESTING.md` with setup and test instructions.
 - Run `python -m pytest -q` locally to validate the suite against the installed dependencies.
 
