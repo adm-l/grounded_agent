@@ -156,109 +156,108 @@ async def chat(request: ChatRequest):
     )
 
     try:
-        async with asyncio.timeout(MCP_TIMEOUT_SECONDS):
-            async with stdio_client(server_params) as (read, write):
-                async with ClientSession(read, write) as session:
-                    await asyncio.wait_for(
-                        session.initialize(), timeout=MCP_TIMEOUT_SECONDS
-                    )
-                    mcp_response = await asyncio.wait_for(
-                        session.list_tools(), timeout=MCP_TIMEOUT_SECONDS
-                    )
+        async with stdio_client(server_params) as (read, write):
+            async with ClientSession(read, write) as session:
+                await asyncio.wait_for(
+                    session.initialize(), timeout=MCP_TIMEOUT_SECONDS
+                )
+                mcp_response = await asyncio.wait_for(
+                    session.list_tools(), timeout=MCP_TIMEOUT_SECONDS
+                )
 
-                    mcp_tools = [
-                        {
-                            "type": "function",
-                            "function": {
-                                "name": tool.name,
-                                "description": tool.description or "",
-                                "parameters": tool.inputSchema,
-                            },
-                        }
-                        for tool in mcp_response.tools
-                    ]
-                    available_tools = LOCAL_TOOLS + mcp_tools
-                    schemas = {
-                        tool["function"]["name"]: tool["function"]["parameters"]
-                        for tool in available_tools
+                mcp_tools = [
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": tool.name,
+                            "description": tool.description or "",
+                            "parameters": tool.inputSchema,
+                        },
                     }
-                    mcp_tool_names = {tool.name for tool in mcp_response.tools}
+                    for tool in mcp_response.tools
+                ]
+                available_tools = LOCAL_TOOLS + mcp_tools
+                schemas = {
+                    tool["function"]["name"]: tool["function"]["parameters"]
+                    for tool in available_tools
+                }
+                mcp_tool_names = {tool.name for tool in mcp_response.tools}
 
-                    for iteration in range(MAX_ITERATIONS):
-                        response = await asyncio.wait_for(
-                            ollama.chat(
-                                model=MODEL,
-                                messages=messages,
-                                tools=available_tools,
-                            ),
-                            timeout=OLLAMA_TIMEOUT_SECONDS,
+                for iteration in range(MAX_ITERATIONS):
+                    response = await asyncio.wait_for(
+                        ollama.chat(
+                            model=MODEL,
+                            messages=messages,
+                            tools=available_tools,
+                        ),
+                        timeout=OLLAMA_TIMEOUT_SECONDS,
+                    )
+                    messages.append(response.message)
+                    tool_calls = response.message.tool_calls or []
+
+                    if not tool_calls:
+                        logger.info(
+                            "Agent request completed request_id=%s iterations=%s tools=%s",
+                            request_id, iteration + 1, len(tool_results),
                         )
-                        messages.append(response.message)
-                        tool_calls = response.message.tool_calls or []
+                        return {
+                            "answer": response.message.content,
+                            "tool_results": tool_results,
+                            "iterations": iteration + 1,
+                            "request_id": request_id,
+                        }
 
-                        if not tool_calls:
-                            logger.info(
-                                "Agent request completed request_id=%s iterations=%s tools=%s",
-                                request_id, iteration + 1, len(tool_results),
+                    for call in tool_calls:
+                        name = call.function.name
+                        arguments = call.function.arguments or {}
+                        logger.info(
+                            "Tool requested request_id=%s tool=%s",
+                            request_id, name,
+                        )
+
+                        if name not in schemas:
+                            result = {"error": "Unknown tool"}
+                        else:
+                            validation_error = validate_tool_arguments(
+                                arguments, schemas[name]
                             )
-                            return {
-                                "answer": response.message.content,
-                                "tool_results": tool_results,
-                                "iterations": iteration + 1,
-                                "request_id": request_id,
-                            }
-
-                        for call in tool_calls:
-                            name = call.function.name
-                            arguments = call.function.arguments or {}
-                            logger.info(
-                                "Tool requested request_id=%s tool=%s",
-                                request_id, name,
-                            )
-
-                            if name not in schemas:
-                                result = {"error": "Unknown tool"}
-                            else:
-                                validation_error = validate_tool_arguments(
-                                    arguments, schemas[name]
+                            if validation_error:
+                                result = {"error": validation_error}
+                            elif name == "check_payment_service_health":
+                                result = await asyncio.wait_for(
+                                    check_payment_service_health(),
+                                    timeout=MCP_TIMEOUT_SECONDS,
                                 )
-                                if validation_error:
-                                    result = {"error": validation_error}
-                                elif name == "check_payment_service_health":
-                                    result = await asyncio.wait_for(
-                                        check_payment_service_health(),
-                                        timeout=MCP_TIMEOUT_SECONDS,
-                                    )
-                                elif name == "get_order_status":
-                                    result = await get_order_status(
-                                        arguments["order_id"]
-                                    )
-                                elif name in mcp_tool_names:
-                                    mcp_result = await asyncio.wait_for(
-                                        session.call_tool(name, arguments=arguments),
-                                        timeout=MCP_TIMEOUT_SECONDS,
-                                    )
-                                    result = serialize_mcp_result(mcp_result)
-                                else:
-                                    result = {"error": "Tool is not permitted"}
+                            elif name == "get_order_status":
+                                result = await get_order_status(
+                                    arguments["order_id"]
+                                )
+                            elif name in mcp_tool_names:
+                                mcp_result = await asyncio.wait_for(
+                                    session.call_tool(name, arguments=arguments),
+                                    timeout=MCP_TIMEOUT_SECONDS,
+                                )
+                                result = serialize_mcp_result(mcp_result)
+                            else:
+                                result = {"error": "Tool is not permitted"}
 
-                            tool_results.append({"tool": name, "result": result})
-                            messages.append({
-                                "role": "tool",
-                                "tool_name": name,
-                                "content": json.dumps(result),
-                            })
+                        tool_results.append({"tool": name, "result": result})
+                        messages.append({
+                            "role": "tool",
+                            "tool_name": name,
+                            "content": json.dumps(result),
+                        })
 
-                    logger.warning(
-                        "Agent iteration limit reached request_id=%s limit=%s",
-                        request_id, MAX_ITERATIONS,
-                    )
-                    return {
-                        "answer": "Agent reached its iteration limit.",
-                        "tool_results": tool_results,
-                        "iterations": MAX_ITERATIONS,
-                        "request_id": request_id,
-                    }
+                logger.warning(
+                    "Agent iteration limit reached request_id=%s limit=%s",
+                    request_id, MAX_ITERATIONS,
+                )
+                return {
+                    "answer": "Agent reached its iteration limit.",
+                    "tool_results": tool_results,
+                    "iterations": MAX_ITERATIONS,
+                    "request_id": request_id,
+                }
 
     except (asyncio.TimeoutError, TimeoutError) as exc:
         logger.warning("Agent timeout request_id=%s", request_id, exc_info=True)
