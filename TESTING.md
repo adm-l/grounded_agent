@@ -28,7 +28,7 @@ The current suite covers:
 - MCP log-search filtering by request ID.
 - Keyword search where every supplied term must match.
 - Empty results for filters that match no sample logs.
-- Mocked `/chat` flow: MCP tool discovery and execution, unknown tool handling, and iteration-limit behavior.
+- Mocked `/chat` flow: MCP tool discovery and execution, unknown tool handling, and iteration-limit behavior.\n- Tool argument validation for missing required fields and incorrect types.\n- Rejection of empty and oversized questions.\n- Generic client-facing error responses when internal exceptions occur.
 
 ## Manual MCP integration smoke test
 
@@ -59,9 +59,9 @@ curl -s -X POST http://localhost:8004/chat \
 
 This is a manual integration check because it depends on a running local model and can produce model-dependent wording. The deterministic pytest suite deliberately avoids requiring Ollama for every test.
 
-## Current limitations
+## Configuration and safety behavior\n\nThe agent reads these optional environment variables:\n\n- `OLLAMA_HOST` (default `http://localhost:11434`)\n- `OLLAMA_MODEL` (default `llama3.2:3b`)\n- `OLLAMA_TIMEOUT_SECONDS` (default `30`)\n- `MCP_TIMEOUT_SECONDS` (default `10`)\n- `AGENT_MAX_ITERATIONS` (default `5`)\n- `LOG_LEVEL` (default `INFO`)\n\nThe API limits questions to 4,000 characters, adds or propagates an `X-Request-ID`, validates basic tool argument types, and avoids returning raw exception messages to clients. The JSON Schema validation is deliberately limited and should not be treated as a full schema validator.\n\n## Current limitations
 
 - These tests use synthetic in-memory data.
 - The `/chat` tests use fake Ollama responses and a fake MCP session; they do not prove compatibility with every installed Ollama/MCP SDK version.
 - The real MCP protocol smoke test is manual, not part of the default pytest run.
-- Tests have been committed but not executed in this environment; run them locally in the project virtual environment to confirm compatibility with your installed dependency versions.
+- Tests have been committed but not executed in this environment; run them locally in the project virtual environment to confirm compatibility with your installed dependency versions. Timeouts and mocked failure cases also need to be exercised in the target environment.
